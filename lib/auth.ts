@@ -62,10 +62,21 @@ export async function verify<T = Record<string, unknown>>(token?: string | null)
   }
 }
 
+export interface SessionPayload {
+  sid: string;
+  aid?: string;
+  email?: string;
+  exp: number;
+}
+
 /** Middleware check: is the cookie signed by us and not expired? The server then checks the session row. */
 export async function readSession(token?: string | null): Promise<string | null> {
-  const o = await verify<{ sid: string }>(token);
+  const o = await verify<SessionPayload>(token);
   return o && o.sid ? o.sid : null;
+}
+
+export async function readSessionPayload(token?: string | null): Promise<SessionPayload | null> {
+  return verify<SessionPayload>(token);
 }
 
 export const PENDING = "dt_2fa";

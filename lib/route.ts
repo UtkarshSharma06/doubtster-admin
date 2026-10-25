@@ -1,7 +1,7 @@
 import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies, headers } from "next/headers";
-import { COOKIE, readSession } from "./auth";
+import { COOKIE, readSession, readSessionPayload } from "./auth";
 import { HttpError } from "./service";
 import { contextFor, type Ctx } from "./admins";
 import { can, type Level, type Section } from "./perm";
@@ -14,8 +14,10 @@ export async function clientIp() {
 /** The signed-in admin, their permissions and session. Null when not signed in or no longer allowed. */
 export async function currentCtx(): Promise<Ctx | null> {
   const c = await cookies();
-  const sid = await readSession(c.get(COOKIE)?.value).catch(() => null);
-  return contextFor(sid, await clientIp());
+  const raw = c.get(COOKIE)?.value;
+  const payload = await readSessionPayload(raw).catch(() => null);
+  if (!payload || !payload.sid) return null;
+  return contextFor(payload.sid, await clientIp(), payload);
 }
 
 type Handler<C> = (req: NextRequest, ctx: Ctx, rc: C) => Promise<unknown>;

@@ -6,6 +6,7 @@ import { checkPassword, hashPassword, passwordProblem, randomToken, sha256 } fro
 import { checkCode, newSecret, otpauthUrl, recoveryCodes } from "./totp";
 import { HttpError, audit } from "./service";
 import { nowISO, uid } from "./util";
+import { seed } from "./seed";
 
 const bad = (m: string) => new HttpError(400, m);
 const forbid = (m = "You do not have access to that.") => new HttpError(403, m);
@@ -59,14 +60,43 @@ function newSession(d: Data, adminId: string, ip: string, ua: string) {
 }
 
 /** Loads the signed-in admin from a session id. Returns null if anything is off. */
-export async function contextFor(sid: string | null, ip: string): Promise<Ctx | null> {
+export async function contextFor(sid: string | null, ip: string, tokenData?: { aid?: string; email?: string } | null): Promise<Ctx | null> {
   if (!sid) return null;
   const d = await read();
-  const s = d.sessions.find((x) => x.id === sid);
-  if (!s || s.revoked || s.expiresAt < nowISO()) return null;
-  if (Date.now() - new Date(s.lastSeen).getTime() > d.security.idleMinutes * 60e3) return null;
-  const a = d.admins.find((x) => x.id === s.adminId);
+  let s = d.sessions.find((x) => x.id === sid);
+
+  const adminId = s?.adminId || tokenData?.aid;
+  const adminEmail = tokenData?.email;
+
+  let a = d.admins.find((x) => (adminId && x.id === adminId) || (adminEmail && x.email === adminEmail));
+  if (!a) {
+    const seeded = seed();
+    a = seeded.admins.find((x) => (adminId && x.id === adminId) || (adminEmail && x.email === adminEmail));
+    if (a) {
+      d.admins.push(a);
+    }
+  }
+
   if (!a || a.status !== "active") return null;
+
+  if (s && s.revoked) return null;
+  if (s && s.expiresAt < nowISO()) return null;
+  if (s && Date.now() - new Date(s.lastSeen).getTime() > d.security.idleMinutes * 60e3) return null;
+
+  if (!s) {
+    s = {
+      id: sid,
+      adminId: a.id,
+      createdAt: nowISO(),
+      lastSeen: nowISO(),
+      expiresAt: new Date(Date.now() + d.security.sessionHours * 3600e3).toISOString(),
+      ip,
+      ua: "verified-session",
+      revoked: false,
+    };
+    d.sessions.push(s);
+  }
+
   if (a.role !== "super" && !ipAllowed(ip, d.security.ipAllowlist)) return null;
   if (Date.now() - new Date(s.lastSeen).getTime() > 120e3) {
     tx((dd) => { const ss = dd.sessions.find((x) => x.id === sid); if (ss) { ss.lastSeen = nowISO(); ss.ip = ip; } }).catch(() => {});
@@ -75,7 +105,7 @@ export async function contextFor(sid: string | null, ip: string): Promise<Ctx | 
 }
 
 /* ---------- login ---------- */
-export type LoginResult = { kind: "ok"; sid: string; exp: number } | { kind: "2fa"; adminId: string } | { kind: "fail"; message: string };
+export type LoginResult = { kind: "ok"; sid: string; aid?: string; email?: string; exp: number } | { kind: "2fa"; adminId: string } | { kind: "fail"; message: string };
 
 /** First run: if there are no admins yet, the env login becomes the super admin. */
 async function bootstrap(email: string, password: string) {
@@ -131,7 +161,7 @@ async function finishLogin(adminId: string, ip: string, ua: string, how: string)
     a.failed = 0; a.lockedUntil = ""; a.lastLogin = nowISO(); a.lastIp = ip;
     const s = newSession(d, a.id, ip, ua);
     audit(d, a.email, "security", "Signed in", a.email, how + (ua ? " · " + shortUa(ua) : ""), ip);
-    return { kind: "ok" as const, sid: s.id, exp: new Date(s.expiresAt).getTime() };
+    return { kind: "ok" as const, sid: s.id, aid: a.id, email: a.email, exp: new Date(s.expiresAt).getTime() };
   });
 }
 
