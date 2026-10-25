@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/hooks/expire-credits",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}
