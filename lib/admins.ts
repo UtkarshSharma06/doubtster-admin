@@ -81,7 +81,7 @@ export type LoginResult = { kind: "ok"; sid: string; exp: number } | { kind: "2f
 async function bootstrap(email: string, password: string) {
   const E = norm(process.env.ADMIN_EMAIL || ""), P = process.env.ADMIN_PASSWORD || "";
   const d = await read();
-  if (d.admins.length || !E || P.length < 12) return;
+  if (d.admins.length || !E || P.length < 10) return;
   if (email !== E || password !== P) return;
   const passHash = await hashPassword(password);
   await tx((dd) => {

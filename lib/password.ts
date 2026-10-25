@@ -27,7 +27,7 @@ export async function checkPassword(pw: string, stored: string) {
 
 /** Simple, clear rules. Length matters most. */
 export function passwordProblem(pw: string, email = "") {
-  if (pw.length < 12) return "Use at least 12 characters.";
+  if (pw.length < 10) return "Use at least 10 characters.";
   if (pw.length > 200) return "That is too long.";
   if (/^(.)\1+$/.test(pw)) return "Do not repeat one character.";
   const low = pw.toLowerCase();
