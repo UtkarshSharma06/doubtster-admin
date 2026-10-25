@@ -14,7 +14,15 @@ import { seed } from "./seed";
   A JSON file does NOT persist on serverless hosts like Vercel.
 */
 
-const FILE = process.env.DATA_FILE || path.join(process.cwd(), ".data", "admin.json");
+function getTargetFile(): string {
+  if (process.env.DATA_FILE) return process.env.DATA_FILE;
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return path.join("/tmp", "admin.json");
+  }
+  return path.join(process.cwd(), ".data", "admin.json");
+}
+
+let FILE = getTargetFile();
 
 let cache: Data | null = null;
 let cacheMtime = 0;
@@ -34,32 +42,49 @@ async function load(): Promise<Data> {
 }
 
 async function readFile(): Promise<Data> {
-  try {
-    const st = await fs.stat(FILE);
-    const raw = await fs.readFile(FILE, "utf8");
-    cacheMtime = st.mtimeMs;
-    const d = JSON.parse(raw) as Data;
-    if (d && d.v === 2) {
-      const fresh = seed() as unknown as Record<string, unknown>;
-      const rec = d as unknown as Record<string, unknown>;
-      for (const k of Object.keys(fresh)) if (!(k in rec)) rec[k] = fresh[k];
-      d.flags = fill(fresh.flags as Record<string, unknown>, d.flags as unknown as Record<string, unknown>) as unknown as Data["flags"];
-      return d;
+  const candidates = Array.from(new Set([FILE, path.join("/tmp", "admin.json"), path.join(process.cwd(), ".data", "admin.json")]));
+  for (const candidate of candidates) {
+    try {
+      const st = await fs.stat(candidate);
+      const raw = await fs.readFile(candidate, "utf8");
+      cacheMtime = st.mtimeMs;
+      const d = JSON.parse(raw) as Data;
+      if (d && d.v === 2) {
+        const fresh = seed() as unknown as Record<string, unknown>;
+        const rec = d as unknown as Record<string, unknown>;
+        for (const k of Object.keys(fresh)) if (!(k in rec)) rec[k] = fresh[k];
+        d.flags = fill(fresh.flags as Record<string, unknown>, d.flags as unknown as Record<string, unknown>) as unknown as Data["flags"];
+        return d;
+      }
+    } catch {
+      /* continue */
     }
-  } catch {
-    /* first run */
   }
   const d = seed();
-  await writeFile(d);
+  await writeFile(d).catch(() => {});
   return d;
 }
 
 async function writeFile(d: Data) {
-  await fs.mkdir(path.dirname(FILE), { recursive: true });
-  const tmp = FILE + "." + process.pid + "." + Math.random().toString(36).slice(2) + ".tmp";
-  await fs.writeFile(tmp, JSON.stringify(d));
-  await fs.rename(tmp, FILE);
-  cacheMtime = (await fs.stat(FILE)).mtimeMs;
+  try {
+    await fs.mkdir(path.dirname(FILE), { recursive: true });
+    const tmp = FILE + "." + process.pid + "." + Math.random().toString(36).slice(2) + ".tmp";
+    await fs.writeFile(tmp, JSON.stringify(d));
+    await fs.rename(tmp, FILE);
+    cacheMtime = (await fs.stat(FILE)).mtimeMs;
+  } catch (err: unknown) {
+    const isErofs = err && typeof err === "object" && (("code" in err && err.code === "EROFS") || ("message" in err && String(err.message).includes("read-only")));
+    if (isErofs && FILE !== path.join("/tmp", "admin.json")) {
+      FILE = path.join("/tmp", "admin.json");
+      await fs.mkdir(path.dirname(FILE), { recursive: true });
+      const tmp = FILE + "." + process.pid + "." + Math.random().toString(36).slice(2) + ".tmp";
+      await fs.writeFile(tmp, JSON.stringify(d));
+      await fs.rename(tmp, FILE);
+      cacheMtime = (await fs.stat(FILE)).mtimeMs;
+    } else {
+      throw err;
+    }
+  }
 }
 
 /** Read the current data. Treat the result as read-only. */
