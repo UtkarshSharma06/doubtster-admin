@@ -3,6 +3,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import type { Data } from "./types";
 import { seed } from "./seed";
+import { fetchLiveSupabaseData } from "./supabaseSync";
 
 /*
   Storage layer.
@@ -121,7 +122,17 @@ async function writeFile(d: Data) {
 /** Read the current data. Treat the result as read-only. */
 export async function read(): Promise<Data> {
   await queue;
-  return load();
+  const d = await load();
+  const live = await fetchLiveSupabaseData();
+  if (live) {
+    return {
+      ...d,
+      users: live.users.length ? live.users : d.users,
+      jobs: live.jobs.length ? live.jobs : d.jobs,
+      payments: live.payments.length ? live.payments : d.payments,
+    };
+  }
+  return d;
 }
 
 /**

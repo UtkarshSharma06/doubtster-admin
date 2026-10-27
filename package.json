@@ -11,6 +11,7 @@
     "admin:reset": "tsx --conditions=react-server scripts/reset-admin.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "@types/qrcode": "^1.5.5",
     "next": "15.5.28",
     "qrcode": "^1.5.4",
