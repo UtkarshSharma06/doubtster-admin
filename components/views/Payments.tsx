@@ -17,7 +17,6 @@ export default function Payments({ payments: P, grants: G, users, trialDays }: {
   return (
     <>
       <Head title="Payments" sub="Fix failed payment verifications by giving a plan or credits by hand. Every grant is logged.">
-        <Note>Sample payments</Note>
         <button className="btn primary" onClick={() => setDrawer({})}>Manual grant</button>
       </Head>
       <div className="grid g4">

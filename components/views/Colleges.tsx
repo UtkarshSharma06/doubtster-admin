@@ -123,7 +123,7 @@ function Tester() {
       <p style={{ margin: "12px 0 0" }}>
         <button className="btn" id="tsim" disabled={!res?.ok || busy} onClick={() => run(() => api<SignupResult & { user: { name: string } }>("colleges/simulate", "POST", { email, verified: ver, code }), (r) => "Signed up " + r.user?.name).then((r) => { if (r) setEmail(""); })}>Simulate this signup</button>
       </p>
-      <p className="help">Creates a sample user through the same code your signup hook uses, and logs it.</p>
+      <p className="help">Creates a test user through the same code your signup hook uses, and logs it.</p>
     </div>
   );
 }

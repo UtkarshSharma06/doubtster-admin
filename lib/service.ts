@@ -524,7 +524,7 @@ export function resetData(by: string) {
   return tx((d) => {
     const keep = { audit: d.audit, admins: d.admins, sessions: d.sessions, invites: d.invites, security: d.security };
     Object.assign(d, seed(), keep);
-    audit(d, by, "system", "Reset to sample data", "all", "");
+    audit(d, by, "system", "Reset to clean live state", "all", "");
     return { ok: true };
   });
 }

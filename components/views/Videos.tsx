@@ -10,7 +10,7 @@ export default function Videos({ jobs }: { jobs: Job[] }) {
   const done = jobs.filter((j) => j.status === "done"), ok = done.filter((j) => Math.abs(j.actual - j.target) / j.target <= 0.03).length;
   return (
     <>
-      <Head title="Videos" sub="Watch generation jobs, retry failures and check length consistency."><Note>Sample jobs</Note></Head>
+      <Head title="Videos" sub="Watch generation jobs, retry failures and check length consistency." />
       <div className="grid g4">
         <Kpi label="In queue or rendering" value={q} />
         <Kpi label="Finished" value={done.length} />

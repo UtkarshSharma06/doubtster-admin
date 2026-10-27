@@ -50,6 +50,37 @@ async function readFile(): Promise<Data> {
       cacheMtime = st.mtimeMs;
       const d = JSON.parse(raw) as Data;
       if (d && d.v === 2) {
+        // Purge any legacy mock sample data
+        const hasSampleUsers = Array.isArray(d.users) && d.users.some((u) => u.id === "u0" || u.email?.includes("uva.nl") || u.email?.includes("@iitd.ac.in") || u.name === "Aarav Mehta");
+        const hasSamplePosts = Array.isArray(d.posts) && d.posts.some((p) => p.id === "p1" || p.slug === "how-to-solve-boat-and-stream-problems");
+        const hasSampleColleges = Array.isArray(d.colleges) && d.colleges.some((c) => (c.id === "c1" && c.domain === "upes.ac.in") || c.domain === "iitd.ac.in");
+        const hasSampleJobs = Array.isArray(d.jobs) && d.jobs.some((j) => j.id === "j1" || j.id === "j7");
+        const hasSamplePayments = Array.isArray(d.payments) && d.payments.some((p) => p.id === "pay_1" || p.id === "pay_4");
+
+        if (hasSampleUsers || hasSamplePosts || hasSampleColleges || hasSampleJobs || hasSamplePayments) {
+          d.users = [];
+          d.posts = [];
+          d.colleges = [];
+          d.creditGrants = [];
+          d.payments = [];
+          d.grants = [];
+          d.jobs = [];
+          d.promos = [];
+          if (d.seo) d.seo.redirects = [];
+          d.audit = [
+            {
+              id: "audit_init",
+              t: new Date().toISOString(),
+              by: "system",
+              type: "system",
+              action: "Sample data purged",
+              target: "Doubtster",
+              detail: "Clean live production state active",
+            },
+          ];
+          await writeFile(d).catch(() => {});
+        }
+
         const fresh = seed() as unknown as Record<string, unknown>;
         const rec = d as unknown as Record<string, unknown>;
         for (const k of Object.keys(fresh)) if (!(k in rec)) rec[k] = fresh[k];

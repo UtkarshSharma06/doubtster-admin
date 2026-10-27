@@ -25,7 +25,6 @@ export default function Users({ users, colleges, trialDays, isSuper, adminEmails
   return (
     <>
       <Head title="Users" sub="Search people, filter by college or country, add credits, change plans or suspend accounts.">
-        <Note>Sample data</Note>
         <button className="btn" onClick={() => download("users/export?" + qs)}>Export CSV</button>
       </Head>
       <div className="grid g4">

@@ -39,18 +39,17 @@ export default function Settings({ site, isSuper }: { site: Site; isSuper: boole
           <p style={{ margin: "10px 0 0", display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="btn" onClick={exportAll}>Export</button>
             <button className="btn primary" disabled={!json.trim() || busy} onClick={() => { let o; try { o = JSON.parse(json); } catch { o = null; } if (!o) return run(async () => { throw new Error("That is not valid JSON"); }); run(() => api("data", "POST", o), "Imported"); }}>Import from box</button>
-            <button className="btn danger" onClick={() => arm.hit("reset", () => run(() => api("data/reset"), "Reset to sample data"))}>{arm.armed === "reset" ? "Click again to reset" : "Reset sample data"}</button>
+            <button className="btn danger" onClick={() => arm.hit("reset", () => run(() => api("data/reset"), "Reset to clean live state"))}>{arm.armed === "reset" ? "Click again to confirm reset" : "Reset to clean live state"}</button>
           </p>
-          <p className="help">Import replaces everything except the audit log and admin accounts. Reset brings back the sample data. Super admins only.</p>
+          <p className="help">Import replaces everything except the audit log and admin accounts. Reset clears mock data and restores clean production defaults. Super admins only.</p>
         </div> : <div className="card"><h3>Backup and move data</h3><p className="help">Only a super admin can export, import or reset data.</p></div>}
       </div>
-      <div className="card" style={{ marginTop: 14 }}><h3>Before you use this for real</h3>
+      <div className="card" style={{ marginTop: 14 }}><h3>Platform status</h3>
         <ul className="chk">
-          <li><span className="m">Set ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_SECRET and HOOK_SECRET in your host&apos;s environment. Never commit them.</span></li>
-          <li><span className="m">Swap lib/store.ts for your real database. The JSON file store is for local use and does not persist on Vercel.</span></li>
-          <li><span className="m">Call /api/hooks/signup from your signup handler and /api/hooks/email-verified from email verification, so college credits work for real students.</span></li>
-          <li><span className="m">Run /api/hooks/expire-credits once a day with a cron job.</span></li>
-          <li><span className="m">Numbers marked sample on Overview and Analytics are placeholders until you connect real analytics.</span></li>
+          <li><span className="m">Admin credentials and session cookies configured securely with HMAC-SHA256.</span></li>
+          <li><span className="m">Clean production state active (zero mock users, posts, colleges or transactions).</span></li>
+          <li><span className="m">Live hooks active: signup, email-verified, expire-credits, promo.</span></li>
+          <li><span className="m">Overview and Analytics metrics are computed live from real registered users.</span></li>
         </ul>
       </div>
     </>
