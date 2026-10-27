@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 /* ---------- toast ---------- */
@@ -191,17 +191,17 @@ export function LineChart({ vals, labels, color }: { vals: number[]; labels: str
   const y = (v: number) => H - P.b - (v / mx) * (H - P.t - P.b);
   const d = vals.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1)).join(" ");
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Chart">
+    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Chart" suppressHydrationWarning>
       {[0, 1, 2, 3, 4].map((k) => {
         const gv = (mx / 4) * k, gy = y(gv);
         return (
           <g key={k}>
             <line x1={P.l} x2={W - P.r} y1={gy} y2={gy} stroke="var(--line)" strokeWidth="1" />
-            <text x={P.l - 6} y={gy + 4} textAnchor="end">{Math.round(gv)}</text>
+            <text x={P.l - 6} y={gy + 4} textAnchor="end" suppressHydrationWarning>{Math.round(gv)}</text>
           </g>
         );
       })}
-      {[0, Math.floor(n / 2), n - 1].map((i) => <text key={i} x={x(i)} y={H - 6} textAnchor="middle">{labels[i]}</text>)}
+      {[0, Math.floor(n / 2), n - 1].map((i) => <text key={i} x={x(i)} y={H - 6} textAnchor="middle" suppressHydrationWarning>{labels[i] || ""}</text>)}
       <path d={`${d} L${x(n - 1)} ${H - P.b} L${x(0)} ${H - P.b} Z`} fill={color} opacity=".12" />
       <path d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" />
       <circle cx={x(n - 1)} cy={y(vals[n - 1])} r="4" fill={color} />
@@ -246,10 +246,22 @@ export function Field({ id, label, hint, children }: { id: string; label: string
 }
 
 export function useLabels(n: number) {
-  const out: string[] = [];
-  const base = Date.now();
-  for (let i = 0; i < n; i++) { const d = new Date(base - (n - 1 - i) * 864e5); out.push(d.getDate() + "/" + (d.getMonth() + 1)); }
-  return out;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  return useMemo(() => {
+    const out: string[] = [];
+    if (!mounted) {
+      for (let i = 0; i < n; i++) out.push("");
+      return out;
+    }
+    const base = Date.now();
+    for (let i = 0; i < n; i++) {
+      const d = new Date(base - (n - 1 - i) * 864e5);
+      out.push(d.getDate() + "/" + (d.getMonth() + 1));
+    }
+    return out;
+  }, [n, mounted]);
 }
 
 /** Seeded random series for sample charts (same numbers every load). */
@@ -262,6 +274,12 @@ export function series(seed: number, n: number, start: number, growth: number, n
 }
 
 export function Ago({ t }: { t: string }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!t) return null;
+  if (!mounted) {
+    return <span suppressHydrationWarning>{t.slice(0, 10)}</span>;
+  }
   const m = Math.round((Date.now() - new Date(t).getTime()) / 6e4);
   const s = m < 1 ? "just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   return <span suppressHydrationWarning>{s}</span>;

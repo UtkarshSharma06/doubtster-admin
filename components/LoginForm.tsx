@@ -13,6 +13,8 @@ export default function LoginForm({ next }: { next: string }) {
   const [busy, setBusy] = useState(false);
   const [caps, setCaps] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { emailRef.current?.focus(); }, []);
   useEffect(() => { if (step === "2fa") codeRef.current?.focus(); }, [step, recovery]);
 
   async function post(url: string, body: unknown) {
@@ -44,7 +46,7 @@ export default function LoginForm({ next }: { next: string }) {
           <h1>Sign in to the admin panel</h1>
           <p className="help" style={{ marginBottom: 6 }}>For the Doubtster team. Use the email your super admin invited.</p>
           <label className="f" htmlFor="em">Work email</label>
-          <input type="email" id="em" autoComplete="username" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input ref={emailRef} type="email" id="em" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
           <label className="f" htmlFor="pw">Password</label>
           <div className="pwrow">
             <input type={show ? "text" : "password"} id="pw" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} onKeyUp={capsCheck} />

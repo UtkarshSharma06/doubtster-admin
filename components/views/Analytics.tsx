@@ -1,11 +1,13 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Flags, User } from "@/lib/types";
 import { countBy, daysAgo, isPaid, money, mrrOf } from "@/lib/util";
 import { TRACK } from "@/lib/track";
 import { api, CopyBox, download, Head, HBars, Kpi, LineChart, Pill, Seg, useAction, useLabels } from "../ui";
 
 export default function Analytics({ users: U, colleges, flags, manual, bulk }: { users: User[]; colleges: { id: string; name: string }[]; flags: Flags; manual: number; bulk: number }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [n, setN] = useState<7 | 30 | 90>(30);
   const [cost, setCost] = useState(String(flags.costPerVideoMin));
   const { run } = useAction();
@@ -133,7 +135,7 @@ export default function Analytics({ users: U, colleges, flags, manual, bulk }: {
             <tbody>{cohorts.map((row, w) => {
               const d = new Date(base - (5 - w) * 7 * 864e5);
               return (
-                <tr key={w}><td suppressHydrationWarning>{d.getDate() + "/" + (d.getMonth() + 1)}</td>
+                <tr key={w}><td suppressHydrationWarning>{mounted ? (d.getDate() + "/" + (d.getMonth() + 1)) : `Week ${w + 1}`}</td>
                   {[0, 1, 2, 3, 4, 5].map((j) => { const v = row[j]; return v == null ? <td key={j} /> : <td key={j} style={{ background: `color-mix(in srgb,var(--blue) ${Math.round(v * 0.85)}%,transparent)`, color: v > 55 ? "#fff" : "var(--ink)" }}>{v}%</td>; })}</tr>
               );
             })}</tbody>
