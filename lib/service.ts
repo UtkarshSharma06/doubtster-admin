@@ -7,6 +7,7 @@ import { evaluateSignup, emailDomain, matchCollege, validateCollege, type Colleg
 import { nowISO, uid } from "./util";
 import { seed } from "./seed";
 import { BOTS } from "./bots";
+import { saveCollegeToSupabase, deleteCollegeFromSupabase } from "./supabaseSync";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -118,18 +119,19 @@ export function expireCredits() {
 /* ---------------- colleges ---------------- */
 
 export function createCollege(raw: Partial<CollegeInput>, by: string) {
-  return tx((d) => {
+  return tx(async (d) => {
     const r = validateCollege(d, raw);
     if ("error" in r) throw bad(r.error);
     const c = { id: uid("c"), created: nowISO(), ...r.value };
     d.colleges.push(c);
     audit(d, by, "college", "Added college", c.domain, c.name + ", " + c.credits + " credits" + (c.active ? "" : ", paused"));
+    saveCollegeToSupabase(c).catch(() => {});
     return c;
   });
 }
 
 export function updateCollege(id: string, raw: Partial<CollegeInput>, by: string) {
-  return tx((d) => {
+  return tx(async (d) => {
     const c = d.colleges.find((x) => x.id === id);
     if (!c) throw notFound();
     const merged = { ...c, ...raw };
@@ -146,16 +148,18 @@ export function updateCollege(id: string, raw: Partial<CollegeInput>, by: string
     const action = changes.length === 1 && wasActive !== c.active ? (c.active ? "Reactivated domain" : "Paused domain")
       : changes.length === 1 && changes[0].startsWith("credits:") ? "Changed signup credits" : "Edited college";
     audit(d, by, "college", action, c.domain, changes.join("; "));
+    saveCollegeToSupabase(c).catch(() => {});
     return c;
   });
 }
 
 export function deleteCollege(id: string, by: string) {
-  return tx((d) => {
+  return tx(async (d) => {
     const c = d.colleges.find((x) => x.id === id);
     if (!c) throw notFound();
     d.colleges = d.colleges.filter((x) => x.id !== id);
     audit(d, by, "college", "Deleted college", c.domain, c.name + ". Users keep their credits.");
+    deleteCollegeFromSupabase(id).catch(() => {});
     return { ok: true };
   });
 }

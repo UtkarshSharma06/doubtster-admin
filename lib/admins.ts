@@ -185,6 +185,73 @@ export async function loginSecondStep(adminId: string, code: string, ip: string,
   return { kind: "fail", message: "That code did not work. Codes change every 30 seconds." };
 }
 
+const adminOtpStore = new Map<string, { code: string; exp: number }>();
+
+export async function sendAdminEmailOtp(emailRaw: string): Promise<{ ok: boolean; message: string }> {
+  const email = norm(emailRaw);
+  const d = await read();
+  const a = d.admins.find((x) => x.email === email);
+  if (!a) {
+    throw bad("No admin account matches that email address.");
+  }
+  if (a.status !== "active") {
+    throw bad("This admin account is not active.");
+  }
+
+  // Generate 6-digit code
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  adminOtpStore.set(email, { code, exp: Date.now() + 10 * 60 * 1000 });
+
+  // Send via Supabase Auth
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://qpsauvbbcpnzmocoacfw.supabase.co";
+  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (sbKey) {
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const sb = createClient(sbUrl, sbKey, { auth: { persistSession: false } });
+      await sb.auth.signInWithOtp({ email }).catch(() => {});
+    } catch {}
+  }
+
+  return { ok: true, message: `A 6-digit verification code has been sent to ${email}.` };
+}
+
+export async function verifyAdminEmailOtp(emailRaw: string, codeRaw: string, ip: string, ua: string): Promise<LoginResult> {
+  const email = norm(emailRaw);
+  const code = String(codeRaw || "").trim().replace(/\D/g, "");
+  const d = await read();
+  const a = d.admins.find((x) => x.email === email);
+  if (!a || a.status !== "active") {
+    return { kind: "fail", message: "No active admin found." };
+  }
+
+  const cached = adminOtpStore.get(email);
+  let valid = false;
+
+  if (cached && cached.exp > Date.now() && cached.code === code) {
+    valid = true;
+    adminOtpStore.delete(email);
+  } else {
+    // Try Supabase verification
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://qpsauvbbcpnzmocoacfw.supabase.co";
+    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+    if (sbKey) {
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const sb = createClient(sbUrl, sbKey, { auth: { persistSession: false } });
+        const { error } = await sb.auth.verifyOtp({ email, token: code, type: "email" });
+        if (!error) valid = true;
+      } catch {}
+    }
+  }
+
+  if (!valid) {
+    return { kind: "fail", message: "Invalid or expired verification code." };
+  }
+
+  return finishLogin(a.id, ip, ua, "email OTP");
+}
+
 export async function logout(sid: string) {
   await tx((d) => {
     const s = d.sessions.find((x) => x.id === sid);

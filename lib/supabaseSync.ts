@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Job, Payment, Plan, User } from "./types";
+import type { College, Job, Payment, Plan, User } from "./types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://qpsauvbbcpnzmocoacfw.supabase.co";
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -52,14 +52,16 @@ export async function fetchLiveSupabaseData(): Promise<{
   users: User[];
   jobs: Job[];
   payments: Payment[];
+  colleges: College[];
 } | null> {
   const sb = getClient();
   if (!sb) return null;
 
   try {
-    const [{ data: authRes, error: authErr }, { data: stateRows, error: stateErr }] = await Promise.all([
+    const [{ data: authRes, error: authErr }, { data: stateRows, error: stateErr }, { data: collegeRows }] = await Promise.all([
       sb.auth.admin.listUsers({ perPage: 1000 }),
       sb.from("app_state").select("*"),
+      sb.from("admin_colleges").select("*"),
     ]);
 
     if (authErr) {
@@ -104,9 +106,9 @@ export async function fetchLiveSupabaseData(): Promise<{
         joined: u.created_at,
         status: "active",
         lang: s.profile?.lang || "en",
-        collegeId: "",
+        collegeId: (meta.college_id as string) || "",
         country: (meta.country as string) || (domain.endsWith(".in") ? "India" : "Global"),
-        source: (u.app_metadata?.provider as string) || "email",
+        source: (u.app_metadata?.provider as string) || (meta.is_student ? "college_signup" : "email"),
         device: "web",
         subject: s.profile?.subjects?.[0] || "General",
         videos: Array.isArray(s.videos) ? s.videos.length : 0,
@@ -162,9 +164,65 @@ export async function fetchLiveSupabaseData(): Promise<{
       }
     }
 
-    return { users, jobs, payments };
+    const colleges: College[] = (collegeRows || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      domain: row.domain,
+      country: row.country || "",
+      subdomains: !!row.subdomains,
+      credits: Number(row.credits ?? 10),
+      expiryDays: Number(row.expiry_days ?? 30),
+      cap: Number(row.cap ?? 0),
+      code: row.code || "",
+      codeMode: row.code_mode || "domain",
+      requireVerify: !!row.require_verify,
+      starts: row.starts || "",
+      ends: row.ends || "",
+      active: row.active !== false,
+      note: row.note || "",
+      created: row.created || new Date().toISOString(),
+    }));
+
+    return { users, jobs, payments, colleges };
   } catch (err) {
     console.warn("[supabaseSync] Sync error:", err);
     return null;
   }
 }
+
+export async function saveCollegeToSupabase(college: College): Promise<void> {
+  const sb = getClient();
+  if (!sb) return;
+  try {
+    await (sb.from("admin_colleges") as any).upsert({
+      id: college.id,
+      name: college.name,
+      domain: college.domain,
+      country: college.country || "",
+      subdomains: !!college.subdomains,
+      credits: Number(college.credits ?? 10),
+      expiry_days: Number(college.expiryDays ?? 30),
+      cap: Number(college.cap ?? 0),
+      code: college.code || "",
+      code_mode: college.codeMode || "domain",
+      require_verify: !!college.requireVerify,
+      starts: college.starts || "",
+      ends: college.ends || "",
+      active: college.active !== false,
+      note: college.note || "",
+    });
+  } catch (err) {
+    console.error("[supabaseSync] saveCollegeToSupabase error:", err);
+  }
+}
+
+export async function deleteCollegeFromSupabase(id: string): Promise<void> {
+  const sb = getClient();
+  if (!sb) return;
+  try {
+    await (sb.from("admin_colleges") as any).delete().eq("id", id);
+  } catch (err) {
+    console.error("[supabaseSync] deleteCollegeFromSupabase error:", err);
+  }
+}
+

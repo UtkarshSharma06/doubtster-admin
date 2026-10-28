@@ -130,6 +130,7 @@ export async function read(): Promise<Data> {
       users: live.users.length ? live.users : d.users,
       jobs: live.jobs.length ? live.jobs : d.jobs,
       payments: live.payments.length ? live.payments : d.payments,
+      colleges: live.colleges !== undefined ? live.colleges : d.colleges,
     };
   }
   return d;
